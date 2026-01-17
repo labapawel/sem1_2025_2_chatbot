@@ -19,7 +19,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const knowledgeBase = fs.readFileSync('bazawiedzy.md', 'utf8');
 
 // Initialize Gemini
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEM_KEY });
 
 const options = {
     key: fs.readFileSync('ss.key'),
@@ -53,7 +53,7 @@ io.on('connection', (socket) => {
             ${msg}`;
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
+                model: process.env.GEM_MODEL,
                 contents: prompt,
             });
 
