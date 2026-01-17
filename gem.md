@@ -1,6 +1,12 @@
 # OPIS OGÓLNY
 Serwis Node.js + Express + Socket.IO obsługujący backend dla widgetu chatbot'a.
 Serwer działa na porcie 3000 z włączonym SSL (HTTPS).
+Klient po połączeniu z serwerem, dostaje unikalny identyfikator sesji. który przypisuje do ciasteczka.
+przy każdym połączeniu z serwerem, klient przekazuje identyfikator sesji.
+
+do serwer dodaj w katalogu historia, plik o nazwie YYYYMMDD_HHMMSS_sessionID.json z historią rozmowy.
+hostorie dokładaj do prompta wysyłanego do Gemini.
+plik jest dodawany przy każdym połączeniu z serwerem, nie po wysłaniu wiadomości.
 
 # ARCHITEKTURA SYSTEMU
 
@@ -27,12 +33,12 @@ Serwer działa na porcie 3000 z włączonym SSL (HTTPS).
 
 
 # GEMINI API
-klucz i model dostępny w pliku .env
+klucz (GEM_KEY) i model (GEM_MODEL) dostępny w pliku .env
 ```
-import { GoogleGenAI } from "@google/genai";
+const { GoogleGenAI } = require("@google/genai");
 
-// The client gets the API key from the environment variable `GEMINI_API_KEY`.
-const ai = new GoogleGenAI({});
+// Konfiguracja API key z zmiennej środowiskowej GEM_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.GEM_KEY });
 
 async function main() {
   const response = await ai.models.generateContent({

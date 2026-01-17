@@ -12,6 +12,41 @@
         // --- Configuration ---
         const SERVER_URL = 'https://localhost:3000';
 
+        // --- Session ID Handling ---
+        function generateUUID() {
+             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                 var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                 return v.toString(16);
+             });
+        }
+
+        function setCookie(name, value, days) {
+            var expires = "";
+            if (days) {
+                var date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + (value || "") + expires + "; path=/; Secure; SameSite=Strict";
+        }
+
+        function getCookie(name) {
+            var nameEQ = name + "=";
+            var ca = document.cookie.split(';');
+            for(var i=0;i < ca.length;i++) {
+                var c = ca[i];
+                while (c.charAt(0)==' ') c = c.substring(1,c.length);
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+            }
+            return null;
+        }
+
+        let sessionId = getCookie('chat_session_id');
+        if (!sessionId) {
+            sessionId = generateUUID();
+            setCookie('chat_session_id', sessionId, 365);
+        }
+
         // --- Styles ---
         const style = document.createElement('style');
         style.textContent = `
@@ -162,7 +197,13 @@
         document.body.appendChild(container);
 
         // --- Logic ---
-        const socket = io(SERVER_URL);
+        // Connect with Session ID
+        const socket = io(SERVER_URL, {
+            query: {
+                sessionId: sessionId
+            }
+        });
+
         const toggleBtn = document.getElementById('chatbot-toggle-btn');
         const chatWindow = document.getElementById('chatbot-window');
         const closeBtn = document.getElementById('chatbot-close');
@@ -180,45 +221,6 @@
             chatWindow.style.display = 'none';
         });
 
-        // Send message
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const msg = input.value.trim();
-            if (msg) {
-                appendMessage(msg, 'user');
-                socket.emit('chat message', msg);
-                input.value = '';
-            }
-        });
-
-        // Receive message
-        socket.on('chat message', (msg) => {
-            // Check if this message is from us (simple heuristic, or just display everything for now)
-            // In a real app we'd filter or handle IDs.
-            // For now, let's assume server broadcasts everything back, so we might duplicate if we append on send AND receive.
-            // Let's modify: ONLY append on receive for simplicity, or handle duplication.
-
-            // To be duplicate-safe in this simple demo:
-            // We'll trust the broadcast. But since I appended on send, I should not append my own message again if the server echoes it identically.
-            // Let's just append everything from server for this basic echo test?
-            // Actually, better UX is instant append, then handle server ack.
-            // For this simple task, let's just append incoming messages that ARE NOT from us if possible, or just append everything.
-            // Since the server implementation does `io.emit`, it creates a simple echo chamber.
-            // Let's remove the "appendMessage" call in submit handler and rely on the server echo for consistency in this demo.
-        });
-
-        // Revised logic: only rely on server broadcast to avoid duplicates in this simple echo setup
-        // But wait, user expects instant feedback.
-        // Let's stick to: Append User Msg -> Send -> Receive (Ignore if it's ours? No ID yet).
-        // Let's just show all messages for now.
-
-        socket.on('chat message', (msg) => {
-            // Basic check to avoid showing our own message twice if we appended it locally
-            // In this simple version, we won't append locally on send, we'll wait for server.
-            appendMessage(msg, 'bot'); // Treating everything from server as 'bot' or general for now.
-            // Ideally we need {text: "abc", sender: "user"} structure.
-        });
-
         function appendMessage(text, sender) {
             const div = document.createElement('div');
             div.classList.add('chat-message', sender);
@@ -227,46 +229,21 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        // Override submit handler slightly to NOT append locally, so we don't have duplicates with the echo server
-        form.removeEventListener('submit', arguments.callee); // clean up if needed (not needed for one-shot)
-
-        // Re-bind properly
-        form.onsubmit = (e) => {
+        // Send message
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             const msg = input.value.trim();
             if (msg) {
-                // Determine if we should show it immediately or wait for echo. 
-                // Let's show it as 'user' immediately for better UX.
-                appendMessage(msg, 'user');
+                 
+                appendMessage(msg, 'user'); // Show instantly
                 socket.emit('chat message', msg);
                 input.value = '';
             }
-        };
+        });
 
-        // Handle specific server echo prevention if needed.
-        // Since `io.emit` sends to all, we will receive our own message.
-        // We need to detect it. 
-        // Quick fix: The server sends just the string.
-        // We can't distinguish sender.
-        // Let's change the server listener to NOT append if it looks exactly like what we just sent? No, that's flaky.
-        // Let's change the client to NOT append locally, and treat all incoming as just messages. 
-        // BUT, we want to style 'my' messages differently.
-        // OK, I'll update the server code in a moment to send objects {text, id}.
-        // For now, I'll assume the user wants a working UI first.
-
-        // Let's refine the socket listener to handle simple text
-        socket.off('chat message');
+        // Receive message
         socket.on('chat message', (msg) => {
-            // For this demo, let's assume if it came from server and we just sent it, it's ours.
-            // Actually, the simplest way for a demo is: don't append locally, just send. 
-            // When it comes back, if it was ours... well we can't tell.
-            // Let's just append everything as 'bot' style if we don't have identity, 
-            // OR let's update this file to just append locally and IGNORE the echo if we can.
-
-            // BETTER APPROACH: Update the server to broadcast to `socket.broadcast.emit` so sender doesn't get it back.
-            // I will update the server code in the next step.
-
-            appendMessage(msg, 'bot');
+            appendMessage(msg, 'bot'); // Server now only sends AI response
         });
     }
 })();
