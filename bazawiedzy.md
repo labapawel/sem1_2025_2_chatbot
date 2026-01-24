@@ -5,6 +5,7 @@ EBTECH to nowoczesna firma inżynierska specjalizująca się w kompleksowych roz
 
 # OPIS FIRMY
 **Dane kontaktowe:**
+* **Właściciel firmy:** Jan Kowalski
 * **Adres:** ul. Inżynierska 15, 00-001 Warszawa
 * **E-mail:** biuro@ebtech.pl
 * **Telefon:** +48 123 456 789

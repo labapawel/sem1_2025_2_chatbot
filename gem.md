@@ -8,6 +8,10 @@ do serwer dodaj w katalogu historia, plik o nazwie YYYYMMDD_HHMMSS_sessionID.jso
 hostorie dokładaj do prompta wysyłanego do Gemini.
 plik jest dodawany przy każdym połączeniu z serwerem, nie po wysłaniu wiadomości.
 
+w pliku .env jest zmienna CHAT_WLASNY=true lub false
+jeżeli jest true, to używa się własnego AI
+jeżeli jest false, to używa się Gemini
+
 # ARCHITEKTURA SYSTEMU
 
 ## Backend (serwis.js)
@@ -30,6 +34,16 @@ plik jest dodawany przy każdym połączeniu z serwerem, nie po wysłaniu wiadom
 # KONFIGURACJA
 - Port: 3000
 - Adres serwera: `https://*:3000`
+
+# Własny AI
+prompt do wysyłania pod adres http://10.40.50.152:8000/generate
+prompt wysyłamy metodą POST 
+{"base_model_name":"Llama-3.1-8B","adapter_name":"wsi","system_prompt":"","prompt":"co robimy na zajęciach"}
+odpowiedź z serwera 
+{
+    "response": "odpowiedź serwera",
+    "model_used": "Llama-3.1-8B/wsi"
+}
 
 
 # GEMINI API

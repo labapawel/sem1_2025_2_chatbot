@@ -80,7 +80,7 @@ io.on('connection', (socket) => {
     // Create THE file immediately upon connection as requested
     const sessionFileBase = `${getTimestamp()}_${sessionId}.json`;
     const sessionFilePath = path.join(HISTORY_DIR, sessionFileBase);
-    
+
     // In-memory history for context in this conversation
     let conversationHistory = [];
 
@@ -101,33 +101,83 @@ io.on('connection', (socket) => {
             .map(entry => `${entry.role === 'user' ? 'UŻYTKOWNIK' : 'AI'}: ${entry.content}`)
             .join('\n');
 
-        try {
-            const prompt = `${systemInstruction}
-            
+        let prompt = `
             BAZA WIEDZY:
             ${knowledgeBase}
 
             HISTORIA ROZMOWY:
             ${historyText}
             
-            ODPOWIEDZ JAKO ASYSTENT:`;
+            `;
 
-            const response = await ai.models.generateContent({
-                model: GEM_MODEL,
-                contents: prompt,
-            });
+        prompt = `## BAZA WIEDZY:\n${knowledgeBase}\n\n `;
 
-            // Send AI response
-            if (response && response.text && typeof response.text === 'function') {
-                 // SDK version check: sometimes response.text() is a function, sometimes a property depends on version. 
-                 // @google/genai usually returns an object where we might need checks.
-                 // Based on doc in gem.md: console.log(response.text); -> It seems to be a property or string in the user's snippet.
-                 // However, safe access is key.
-                 // Wait, gem.md example: console.log(response.text);
-                 // I will assume it is a property string.
+        try {
+            let aiResponseText = "";
+
+            if (process.env.CHAT_WLASNY === 'true') {
+                // Use Custom AI
+                console.log(`[${sessionId}] Using Custom AI...`);
+
+                const postData = JSON.stringify({
+                    "base_model_name": "Llama-3.1-8B",
+                    "adapter_name": "wsi",
+                    "system_prompt": systemInstruction, // system instruction is already in the prompt text
+                    "prompt": prompt
+                });
+
+                const http = require('http'); // Import connecting to http (internal IP)
+
+                const options = {
+                    hostname: '10.40.50.152',
+                    port: 8000,
+                    path: '/generate',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(postData)
+                    }
+                };
+
+                aiResponseText = await new Promise((resolve, reject) => {
+                    const req = http.request(options, (res) => {
+                        let data = '';
+                        res.setEncoding('utf8');
+                        res.on('data', (chunk) => { data += chunk; });
+                        res.on('end', () => {
+                            try {
+                                if (res.statusCode !== 200) {
+                                    reject(new Error(`Server returned status code ${res.statusCode}: ${data}`));
+                                    return;
+                                }
+                                const json = JSON.parse(data);
+                                console.log(`[${sessionId}] Custom AI response model:`, json.model_used);
+                                resolve(json.response);
+                            } catch (e) {
+                                reject(e);
+                            }
+                        });
+                    });
+
+                    req.on('error', (e) => {
+                        reject(e);
+                    });
+
+                    req.write(postData);
+                    req.end();
+                });
+
+            } else {
+                // Use Gemini
+                console.log(`[${sessionId}] Using Gemini...`);
+                const response = await ai.models.generateContent({
+                    model: GEM_MODEL,
+                    contents: prompt,
+                });
+
+                // Handle different response structures if needed, but per previous code:
+                aiResponseText = response.text || "Przepraszam, nie udało się wygenerować odpowiedzi.";
             }
-            
-            const aiResponseText = response.text || "Przepraszam, nie udało się wygenerować odpowiedzi.";
 
             console.log(`[${sessionId}] AI:`, aiResponseText);
 
@@ -139,7 +189,7 @@ io.on('connection', (socket) => {
             socket.emit('chat message', aiResponseText);
 
         } catch (error) {
-            console.error("Gemini Error:", error);
+            console.error("AI Error:", error);
             const errorMsg = "Przepraszam, wystąpił błąd podczas generowania odpowiedzi.";
             socket.emit('chat message', errorMsg);
         }
